@@ -52,15 +52,69 @@ export class Game {
   private material(color: number, emissive = 0x000000) { return new THREE.MeshStandardMaterial({ color, emissive, emissiveIntensity: 0.65, metalness: 0.55, roughness: 0.4 }) }
   private box(x:number,y:number,z:number,w:number,h:number,d:number,color:number, emissive=0) { const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),this.material(color,emissive)); mesh.position.set(x,y,z); mesh.castShadow=true; mesh.receiveShadow=true; this.scene.add(mesh); return mesh }
   private makeMap() {
-    this.box(0,-0.55,0,32,1,24,0x102d32); this.box(0,-1.15,0,33,0.3,25,0x1c242b)
-    // 主板走线：使用地面装饰，不参与碰撞。
-    for(let i=0;i<18;i++){ const z=-11+i*1.28; this.box(0,-0.035,z,30,0.025,0.025,i%3===0?0x47e9dc:0x777044,i%3===0?0x08766b:0x252000) }
-    for(let i=0;i<22;i++){ const x=-15+i*1.42; this.box(x,-0.025,0,0.025,0.025,22,0x66734d,0x1b2613) }
-    const obstacle=(x:number,z:number,w:number,d:number,h:number,color:number)=>{this.obstacles.push({x,z,w,d}); this.box(x,h/2,z,w,h,d,color)}
-    obstacle(0,0,4.2,4.2,1.2,0x555c60); this.box(0,1.23,0,3.5,.1,3.5,0x9b9b86); this.box(0,1.3,0,2.7,.07,2.7,0x39464b)
-    for(const x of [-9,9]) for(const z of [-4,4]) { obstacle(x,z,1,5,2,0x202c35); this.box(x,2.03,z,1.05,.1,5,0x30c3ca,0x087e8a) }
-    for(const [x,z] of [[-5,-8],[4,-8],[-5,8],[5,8],[-13,0],[13,0]]) { const cyl = new THREE.Mesh(new THREE.CylinderGeometry(.8,.8,1.6,20),this.material(0x353d49)); cyl.position.set(x,0.8,z); cyl.castShadow=true; this.scene.add(cyl); this.obstacles.push({x,z,w:1.6,d:1.6}); this.box(x,1.62,z,.65,.04,.65,0x8297a0) }
-    for(let i=0;i<7;i++) this.box(-14+i*1.2,.15,-11, .7,.35,.5,0x272e36)
+    // 战场以主板为地面；发光线路及小元件仅作装饰，掩体单独登记碰撞。
+    this.box(0, -.55, 0, 32, 1, 24, 0x202521)
+    this.box(0, -1.15, 0, 33, .3, 25, 0x10151a)
+    const gold = 0xd39627
+    const glow = 0x6e3904
+    for (let i = 0; i < 16; i++) {
+      const z = -10.8 + i * 1.43
+      this.box(0, -.035, z, 30.4, .025, .035, i % 3 ? 0x786b3a : gold, i % 3 ? 0x241d08 : glow)
+    }
+    for (let i = 0; i < 20; i++) {
+      const x = -14.5 + i * 1.52
+      this.box(x, -.03, 0, .035, .025, 22, 0x706039, 0x211909)
+    }
+    const obstacle = (x: number, z: number, w: number, d: number, h: number, color: number) => {
+      this.obstacles.push({ x, z, w, d })
+      this.box(x, h / 2, z, w, h, d, color)
+    }
+    // CPU 底座与地面连通，允许角色从四面进入中心战区。
+    this.box(0, -.025, 0, 6.1, .05, 6.1, 0x999c91)
+    this.box(0, -.012, 0, 5.4, .025, 5.4, 0x353b38)
+    this.box(0, .002, 0, 4.5, .025, 4.5, 0x77786d)
+    for (let i = -4; i <= 4; i++) {
+      this.box(i * .48, .02, 0, .025, .025, 4.25, 0xb2a77a)
+      this.box(0, .02, i * .48, 4.25, .025, .025, 0xb2a77a)
+    }
+    for (const x of [-2.8, 2.8]) for (const z of [-2.8, 2.8]) this.box(x, .035, z, .25, .04, .25, gold, glow)
+    // 散热装甲：挡住角色和子弹，但保留绕行通道。
+    for (const [x, z, w, d] of [[-10, -6.4, 4.2, 2.3], [-10, 4.8, 4.2, 2.3], [10, 7.8, 4.0, 1.8]]) {
+      obstacle(x, z, w, d, 1.55, 0x30383b)
+      this.box(x, 1.58, z, w * .9, .07, d * .82, 0x505858)
+      for (let i = -2; i <= 2; i++) this.box(x + i * .58, 1.64, z, .13, .07, d * .76, 0x171e20)
+      this.box(x, 1.69, z, w * .65, .035, .1, gold, glow)
+    }
+    // 四条内存槽形成可绕行的墙体，每条使用与外观一致的碰撞盒。
+    for (let i = 0; i < 4; i++) {
+      const x = 6.5 + i * 1.65
+      obstacle(x, -5.5, .65, 6.5, 1.05, 0x20292d)
+      this.box(x, 1.08, -5.5, .5, .07, 6.1, 0x56605f)
+      for (const z of [-8.35, -2.65]) this.box(x, 1.15, z, .72, .18, .35, gold)
+    }
+    // PCIe 插槽与 M.2 散热片放在下半区，缩短长度留出通道。
+    for (const z of [5.2, 8.8]) {
+      obstacle(-3.8, z, 6.2, .65, .62, 0x222b2c)
+      this.box(-3.8, .66, z, 5.8, .07, .34, 0xb0a27b)
+      this.box(-3.8, .71, z, 5.3, .05, .12, 0x232b2b)
+    }
+    this.box(3.6, .12, 6.1, 3.8, .24, .8, 0x4a5250)
+    this.box(3.6, .26, 6.1, 3.3, .04, .1, gold, glow)
+    // 四周接口、芯片和电容：边缘装饰不占用出生点。
+    for (let i = 0; i < 6; i++) {
+      const z = -9.2 + i * 3.5
+      this.box(-15.35, .55, z, 1.1, 1.1, 1.8, 0x56605e)
+      this.box(-15.4, 1.13, z, .65, .05, 1.15, 0x20282a)
+    }
+    for (let i = 0; i < 12; i++) {
+      const x = -13.5 + i * 2.45
+      this.box(x, .16, -11.5, 1.05, .32, .55, 0x323b3a)
+      this.box(x, .33, -11.5, .55, .04, .2, gold)
+    }
+    for (const [x, z] of [[-6.6,-3.7],[-6.6,1.5],[4.5,2.6],[7,10.7],[-9,10.7],[13.8,2.5]]) {
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(.28, .28, .55, 12), this.material(0x59605a))
+      cap.position.set(x,.275,z); cap.castShadow = true; this.scene.add(cap)
+    }
   }
   private createUnit(kind:Kind, x:number,z:number):Unit {
     const group=new THREE.Group(); const color=kind==='dragon'?0xe43739:0x29bed8
@@ -71,7 +125,7 @@ export class Game {
     const gun=new THREE.Mesh(new THREE.CylinderGeometry(.15,.2,.85,10),this.material(0x526776)); gun.rotation.x=Math.PI/2; gun.position.set(.42,.9,.65); group.add(gun)
     group.position.set(x,0,z); this.scene.add(group); return {group,pos:group.position,hp:100,kind,shot:0,skill:0}
   }
-  reset(kind:Kind) { this.selected=kind; if(this.player) this.scene.remove(this.player.group); if(this.enemy) this.scene.remove(this.enemy.group); for(const b of this.bullets) this.scene.remove(b.mesh); this.bullets=[]; this.keys.clear(); this.firing=false; this.player=this.createUnit(kind,-12,8); this.enemy=this.createUnit(kind==='dragon'?'raptor':'dragon',12,-8); this.status='ready'; this.emit() }
+  reset(kind:Kind) { this.selected=kind; if(this.player) this.scene.remove(this.player.group); if(this.enemy) this.scene.remove(this.enemy.group); for(const b of this.bullets) this.scene.remove(b.mesh); this.bullets=[]; this.keys.clear(); this.firing=false; this.player=this.createUnit(kind,-12,8); this.enemy=this.createUnit(kind==='dragon'?'raptor':'dragon',13.8,-10); this.status='ready'; this.emit() }
   start(kind:Kind) { this.reset(kind); this.status='playing'; this.clock.getDelta(); this.emit() }
   togglePause() { if(this.status==='playing'){this.status='paused';this.keys.clear();this.firing=false} else if(this.status==='paused'){this.status='playing';this.clock.getDelta()} this.emit() }
   private emit(){this.notify({playerHp:Math.max(0,this.player.hp),enemyHp:Math.max(0,this.enemy.hp),cooldown:Math.max(0,this.player.skill),status:this.status})}
@@ -95,3 +149,4 @@ export class Game {
   private loop=()=>{this.frame=requestAnimationFrame(this.loop);const dt=Math.min(this.clock.getDelta(),.04);if(this.status==='playing')this.update(dt); const focus=this.player.pos; this.camera.position.lerp(new THREE.Vector3(focus.x,20,focus.z+18),.08);this.camera.lookAt(focus.x,0,focus.z);this.renderer.render(this.scene,this.camera)}
   destroy(){cancelAnimationFrame(this.frame);this.resizeObserver.disconnect();window.removeEventListener('keydown',this.onKeyDown);window.removeEventListener('keyup',this.onKeyUp);window.removeEventListener('blur',this.onBlur);window.removeEventListener('pointerup',this.onUp);this.renderer.domElement.removeEventListener('pointermove',this.onPointerMove);this.renderer.domElement.removeEventListener('pointerdown',this.onDown);this.scene.traverse(obj=>{if(obj instanceof THREE.Mesh){obj.geometry.dispose(); const m=obj.material; (Array.isArray(m)?m:[m]).forEach(v=>v.dispose())}});this.renderer.dispose();this.renderer.domElement.remove()}
 }
+
